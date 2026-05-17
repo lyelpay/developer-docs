@@ -1,0 +1,28 @@
+/* Lyel Pay developer docs — tokens from lyel-pay-showcase (globals.css) */
+
+#navbar,
+#sidebar {
+  background-color: #050e12;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+#content-area {
+  background-color: #050e12;
+}
+
+#topbar-cta-button,
+[data-component-name="primary-header-button"] {
+  background-color: #fe6a49 !important;
+  border-color: #fe6a49 !important;
+  color: #ffffff !important;
+}
+
+#topbar-cta-button:hover,
+[data-component-name="primary-header-button"]:hover {
+  background-color: #ff8066 !important;
+  border-color: #ff8066 !important;
+}
+
+card {
+  border-color: rgba(255, 255, 255, 0.08);
+}

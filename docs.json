@@ -3,11 +3,21 @@
   "theme": "mint",
   "name": "Lyel Pay",
   "colors": {
-    "primary": "#F97316",
-    "light": "#FB923C",
-    "dark": "#EA580C"
+    "primary": "#0ECBB8",
+    "light": "#5EEAD4",
+    "dark": "#08313A"
   },
-  "favicon": "/favicon.svg",
+  "appearance": {
+    "default": "dark"
+  },
+  "background": {
+    "decoration": "gradient",
+    "color": {
+      "light": "#F8FAF9",
+      "dark": "#050E12"
+    }
+  },
+  "favicon": "/favicon.ico",
   "navigation": {
     "tabs": [
       {
@@ -39,20 +49,6 @@
             ]
           }
         ]
-      },
-      {
-        "tab": "API Reference",
-        "groups": [
-          {
-            "group": "API Reference",
-            "pages": [
-              "api-reference/payment-intents",
-              "api-reference/transfers",
-              "api-reference/wallet",
-              "api-reference/authentication"
-            ]
-          }
-        ]
       }
     ],
     "global": {
@@ -71,21 +67,8 @@
     }
   },
   "logo": {
-    "light": "/logo/lyelpay-light.svg",
-    "dark": "/logo/lyelpay-dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Dashboard",
-        "href": "https://dashboard.lyelpay.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Get API Keys",
-      "href": "https://dashboard.lyelpay.com/settings/api-keys"
-    }
+    "light": "/logo/logo-light.svg",
+    "dark": "/logo/logo-dark.svg"
   },
   "footer": {
     "socials": {

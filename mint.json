@@ -7,20 +7,14 @@
   },
   "favicon": "/favicon.ico",
   "colors": {
-    "primary": "#F97316",
-    "light": "#FB923C",
-    "dark": "#EA580C",
+    "primary": "#0ECBB8",
+    "light": "#5EEAD4",
+    "dark": "#08313A",
     "anchors": {
-      "from": "#F97316",
-      "to": "#EA580C"
+      "from": "#08313A",
+      "to": "#0ECBB8"
     }
   },
-  "tabs": [
-    {
-      "name": "API Reference",
-      "url": "api-reference"
-    }
-  ],
   "anchors": [
     {
       "name": "Status",
@@ -57,15 +51,6 @@
         "guides/accept-payment",
         "guides/webhooks",
         "guides/errors"
-      ]
-    },
-    {
-      "group": "API Reference",
-      "pages": [
-        "api-reference/payment-intents",
-        "api-reference/transfers",
-        "api-reference/wallet",
-        "api-reference/authentication"
       ]
     }
   ],
