@@ -1,0 +1,98 @@
+---
+title: Authentication
+description: How to authenticate your requests to the Lyel Pay API.
+---
+
+Lyel Pay uses two authentication mechanisms depending on the context: **API Keys** and **Bearer tokens (JWT)**. In most flows, both are used together.
+
+---
+
+## API Keys
+
+An API key identifies your merchant account. Every request must carry it.
+
+### Where to get your key
+
+Go to your dashboard → **Settings → API Keys**. You can generate multiple keys and rotate them independently.
+
+### How to send it
+
+```http
+x-api-key: YOUR_API_KEY
+```
+
+API keys are sent as a request header, **not** in the URL or query string.
+
+<Warning>
+  Never expose your API key in client-side JavaScript or a public repository. Use environment variables.
+</Warning>
+
+---
+
+## Bearer tokens (JWT)
+
+Some endpoints — particularly those that act on behalf of a specific user (e.g., initiating a payment from a user's wallet) — require a short-lived JWT in addition to the API key.
+
+The token is obtained by authenticating the user via the `/auth/web` endpoint:
+
+```http
+POST /auth/web
+Content-Type: application/json
+x-api-key: YOUR_API_KEY
+
+{
+  "phoneNumber": "+242XXXXXXXX",
+  "password": "user_web_password"
+}
+```
+
+Response:
+
+```json
+{
+  "id": "user_abc123",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "phoneNumber": "+242XXXXXXXX",
+  "roles": ["USER"]
+}
+```
+
+Then pass both headers on subsequent requests:
+
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+x-api-key: YOUR_API_KEY
+```
+
+---
+
+## OTP tokens
+
+The four-step payment flow adds a third layer: an OTP-derived token that authorizes the specific transaction.
+
+| Step | What happens |
+|------|-------------|
+| `initOtp()` | Lyel Pay sends an OTP to the user via SMS or email |
+| `verifyOtp()` | You send the OTP back; Lyel Pay validates it and stores an authorization token in the SDK instance |
+| `charge()` | The token is automatically included; the transaction executes |
+
+In the browser SDK, the token is held in memory in the `LyelPay` instance (not persisted). It is scoped to one transaction.
+
+---
+
+## Authentication by SDK
+
+| SDK | Mechanism |
+|-----|-----------|
+| `@lyel/lyel-pay` (browser) | `apiKey` in constructor + JWT from `initOtp`/`verifyOtp` flow |
+| `@lyel/lyel-pay-node` | `secretKey` in constructor (Bearer token sent as `Authorization` header) |
+| `react-lyel-pay-js` | `apiKey` + `clientSecret` in `loadLyelPay()` |
+
+---
+
+## Security checklist
+
+- [x] Store API keys in environment variables, never in source code
+- [x] Use HTTPS for all requests (enforced by the API)
+- [x] Validate webhook signatures on your server before processing events ([see Webhooks](/guides/webhooks))
+- [x] Rotate API keys periodically from the dashboard

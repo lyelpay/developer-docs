@@ -1,0 +1,72 @@
+---
+title: Introduction
+description: Lyel Pay — the payment infrastructure built for African businesses.
+---
+
+## What is Lyel Pay?
+
+Lyel Pay is a payment platform that lets your users **pay, receive, and manage money** from a single place. For developers, it means one API and a set of SDKs to:
+
+- Accept payments from mobile money wallets (MTN MoMo, Orange Money, Airtel Money, M-Pesa, and more)
+- Send transfers between users
+- Handle cash-in and cash-out
+- Issue billing and invoices
+- Track all transactions in real time via a backoffice
+
+Lyel Pay operates in **XAF** (Central Africa / CEMAC zone) and **XOF** (West Africa / UEMOA zone).
+
+---
+
+## How it works
+
+Lyel Pay uses a **four-step transaction flow** for all operations:
+
+<Steps>
+  <Step title="Create an Intention">
+    Declare the operation you want to execute (payment, deposit, withdrawal, or transfer) with an amount and the parties involved.
+  </Step>
+  <Step title="Send OTP">
+    Trigger an SMS or email OTP to the user who needs to authorize the operation.
+  </Step>
+  <Step title="Verify OTP">
+    The user enters the code they received. Lyel Pay validates it and issues a short-lived authorization token.
+  </Step>
+  <Step title="Execute">
+    Call `charge()` (browser SDK) or use the gateway endpoint (server) to finalize the transaction.
+  </Step>
+</Steps>
+
+---
+
+## Choose your integration
+
+<CardGroup cols={2}>
+  <Card title="JavaScript SDK" icon="js" href="/sdks/javascript">
+    Browser-side integration. Best for web checkout flows where the user interacts directly in the browser.
+  </Card>
+  <Card title="Node.js SDK" icon="node-js" href="/sdks/node">
+    Server-side integration. Best for backend-initiated payments, webhooks, and SaaS billing.
+  </Card>
+  <Card title="React SDK" icon="react" href="/sdks/react">
+    Drop-in React components. Embed a ready-made payment form in minutes.
+  </Card>
+  <Card title="REST API" icon="code" href="/api-reference/payment-intents">
+    Raw HTTP. Use any language or platform that can make HTTP requests.
+  </Card>
+</CardGroup>
+
+---
+
+## Base URL
+
+All API requests go to:
+
+```
+https://api.lyelpay.com
+```
+
+---
+
+## Support
+
+Something not working? Reach out at **support@lyelpay.com** or open a ticket from your dashboard.

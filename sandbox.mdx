@@ -1,0 +1,30 @@
+---
+title: Sandbox
+description: Test your integration before going live.
+---
+
+<Note>
+  The sandbox environment is **coming soon**. We're working on it and will notify all developers when it's available.
+</Note>
+
+## What to expect
+
+When the sandbox launches, you'll be able to:
+
+- Get dedicated **test API keys** from your dashboard (prefixed with `test_`)
+- Trigger payments, transfers, and webhooks without real money moving
+- Simulate all payment statuses: `PENDING`, `COMPLETED`, `FAILED`, `EXPIRED`
+- Test OTP flows with a fixed test code (no real SMS sent)
+- Replay webhook events from the dashboard
+
+## Preparing now
+
+Even without a sandbox, you can prepare your integration:
+
+1. **Build against the real API types** — all TypeScript types in `@lyel/lyel-pay-node` are production-ready and won't change.
+2. **Mock the SDK** in your test suite using the interfaces from `@lyelpay/errors` for error codes.
+3. **Set up your webhook endpoint** — the signature validation logic works the same in test and production.
+
+## Get notified
+
+Contact **support@lyelpay.com** to be added to the sandbox early access list and receive test credentials ahead of the public release.

@@ -1,0 +1,160 @@
+---
+title: Quickstart
+description: Process your first payment in under 5 minutes.
+---
+
+## Before you start
+
+You'll need:
+- A Lyel Pay account — [create one here](https://dashboard.lyelpay.com/register)
+- An **API key** from your dashboard → Settings → API Keys
+
+<Note>
+  No sandbox environment yet. Contact **support@lyelpay.com** to get test credentials while we set up the sandbox.
+</Note>
+
+---
+
+## Option A — Node.js (recommended for backend)
+
+### 1. Install the SDK
+
+```bash
+npm install @lyel/lyel-pay-node
+```
+
+### 2. Create a payment intent
+
+```typescript
+import { LyelPay } from '@lyel/lyel-pay-node';
+
+const lyel = new LyelPay('YOUR_SECRET_KEY');
+
+const intent = await lyel.paymentIntents.create({
+  amount: '5000',       // amount in smallest currency unit
+  currency: 'XAF',
+  description: 'Order #1042 — Boutique Fatou',
+  metadata: {
+    orderId: '1042',
+    customerId: 'cust_abc123',
+  },
+});
+
+console.log(intent.sessionToken); // pass this to your frontend
+console.log(intent.status);       // 'PENDING'
+```
+
+### 3. Listen for the result via webhook
+
+When the payment completes, Lyel Pay sends a `payment.completed` event to your webhook endpoint.
+
+```typescript
+// Express example
+app.post('/webhooks/lyelpay', express.raw({ type: 'application/json' }), (req, res) => {
+  const signature = req.headers['lyel-signature'] as string;
+  
+  try {
+    const event = lyel.webhooks.constructEvent(
+      req.body.toString(),
+      signature,
+      'YOUR_WEBHOOK_SECRET',
+    );
+
+    if (event.type === 'payment.completed') {
+      const { paymentIntent } = event.data;
+      console.log('Paid:', paymentIntent.id, paymentIntent.amount, paymentIntent.currency);
+      // → fulfill the order here
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Webhook error:', err.message);
+    res.sendStatus(400);
+  }
+});
+```
+
+---
+
+## Option B — Browser (JavaScript SDK)
+
+### 1. Install
+
+```bash
+npm install @lyel/lyel-pay-js
+```
+
+### 2. Full payment flow
+
+```typescript
+import { LyelPay, OPERATION_TYPE_ENDPOINTS } from '@lyel/lyel-pay-js';
+
+const lyel = new LyelPay({
+  apiKey: 'YOUR_API_KEY',
+  env: 'production',
+});
+
+// Step 1 — Declare the payment
+const intention = await lyel.createIntention(OPERATION_TYPE_ENDPOINTS.PAYMENT, {
+  amount: 5000,
+  from: 'MERCHANT_ID',
+  to: 'CLIENT_ID',
+  currency: 'XAF',
+  description: 'Order #1042',
+});
+
+// Step 2 — Send OTP to the paying user
+await lyel.initOtp({ userId: 'CLIENT_ID' });
+
+// Step 3 — User enters OTP in your UI, you verify it
+await lyel.verifyOtp({ userId: 'CLIENT_ID', otp: userInput });
+
+// Step 4 — Execute
+const result = await lyel.charge({ intentionId: intention.id });
+console.log('Done ✅', result);
+```
+
+---
+
+## Option C — React (drop-in form)
+
+### 1. Install
+
+```bash
+npm install react-lyel-pay-js
+```
+
+### 2. Wrap your app and drop in the form
+
+```tsx
+import { loadLyelPay, LyelPayElements } from 'react-lyel-pay-js';
+
+const lyelPayPromise = loadLyelPay('YOUR_API_KEY', 5000, 'YOUR_CLIENT_SECRET');
+
+export default function CheckoutPage() {
+  return (
+    <div>
+      <h2>Complete your payment</h2>
+      <LyelPayElements options={lyelPayPromise} />
+    </div>
+  );
+}
+```
+
+The component handles the phone/password form and OTP confirmation UI automatically.
+
+---
+
+## Next steps
+
+<CardGroup cols={3}>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Understand API keys, JWT tokens, and when to use each.
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/guides/webhooks">
+    Receive real-time events when payments complete or fail.
+  </Card>
+  <Card title="Error handling" icon="triangle-exclamation" href="/guides/errors">
+    Handle errors gracefully with typed error codes.
+  </Card>
+</CardGroup>

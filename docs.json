@@ -1,0 +1,96 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Lyel Pay",
+  "colors": {
+    "primary": "#F97316",
+    "light": "#FB923C",
+    "dark": "#EA580C"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "authentication",
+              "sandbox"
+            ]
+          },
+          {
+            "group": "SDKs",
+            "pages": [
+              "sdks/javascript",
+              "sdks/node",
+              "sdks/react"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/accept-payment",
+              "guides/webhooks",
+              "guides/errors"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API Reference",
+            "pages": [
+              "api-reference/payment-intents",
+              "api-reference/transfers",
+              "api-reference/wallet",
+              "api-reference/authentication"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Status",
+          "href": "https://status.lyelpay.com",
+          "icon": "signal"
+        },
+        {
+          "anchor": "Community",
+          "href": "https://discord.gg/lyelpay",
+          "icon": "discord"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/lyelpay-light.svg",
+    "dark": "/logo/lyelpay-dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Dashboard",
+        "href": "https://dashboard.lyelpay.com"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get API Keys",
+      "href": "https://dashboard.lyelpay.com/settings/api-keys"
+    }
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/lyelpay",
+      "linkedin": "https://linkedin.com/company/lyelpay"
+    }
+  }
+}

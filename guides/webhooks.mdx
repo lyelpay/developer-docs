@@ -1,0 +1,186 @@
+---
+title: Webhooks
+description: Receive real-time notifications when payments complete, fail, or expire.
+---
+
+Webhooks are HTTP POST requests that Lyel Pay sends to your server when something happens — a payment completes, fails, or expires. They are the **recommended way** to trigger business logic like fulfilling orders or sending receipts.
+
+---
+
+## How to set up a webhook endpoint
+
+### 1. Create the endpoint
+
+Your endpoint must:
+- Accept `POST` requests
+- Return `2xx` within a reasonable time (we recommend < 5 seconds)
+- Process the raw request body (not parsed JSON) for signature validation
+
+```typescript
+// Express
+import express from 'express';
+import { LyelPay } from '@lyel/lyel-pay-node';
+
+const lyel = new LyelPay(process.env.LYELPAY_SECRET_KEY!);
+const app = express();
+
+app.post(
+  '/webhooks/lyelpay',
+  express.raw({ type: 'application/json' }), // ← raw body, not express.json()
+  async (req, res) => {
+    const payload = req.body.toString();
+    const signature = req.headers['lyel-signature'] as string;
+
+    let event;
+    try {
+      event = lyel.webhooks.constructEvent(
+        payload,
+        signature,
+        process.env.LYELPAY_WEBHOOK_SECRET!,
+      );
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err.message);
+      return res.sendStatus(400);
+    }
+
+    // Handle the event
+    switch (event.type) {
+      case 'payment.completed':
+        await handlePaymentCompleted(event.data.paymentIntent);
+        break;
+      case 'payment.failed':
+        await handlePaymentFailed(event.data.paymentIntent);
+        break;
+      case 'payment.expired':
+        await handlePaymentExpired(event.data.paymentIntent);
+        break;
+      default:
+        console.log('Unhandled event type:', event.type);
+    }
+
+    res.sendStatus(200);
+  }
+);
+```
+
+### 2. Register your URL in the dashboard
+
+Go to your dashboard → **Settings → Webhooks → Add endpoint**.
+
+Copy the **Webhook Secret** shown — you'll need it for signature validation.
+
+---
+
+## Signature validation
+
+Every webhook request includes a `lyel-signature` header:
+
+```
+lyel-signature: t=1716000000,v1=3d3d2b5...
+```
+
+| Part | Description |
+|------|-------------|
+| `t` | Unix timestamp (seconds) when the event was sent |
+| `v1` | HMAC-SHA256 signature |
+
+The signature is computed as:
+
+```
+HMAC-SHA256(secret, "{t}.{raw_payload}")
+```
+
+`constructEvent()` handles this automatically, including:
+- Parsing the header
+- Recomputing the signature
+- Rejecting events older than **5 minutes** (to prevent replay attacks)
+- Using `timingSafeEqual` to prevent timing attacks
+
+<Warning>
+  If you parse the body with `express.json()` before the raw body middleware, the signature check will fail because the body will be re-serialized and the bytes will differ.
+</Warning>
+
+---
+
+## Event types
+
+### `payment.completed`
+
+Fired when a payment intent reaches `COMPLETED` status.
+
+```json
+{
+  "id": "evt_01HX...",
+  "type": "payment.completed",
+  "created": 1716000000,
+  "data": {
+    "paymentIntent": {
+      "id": "pi_01HX...",
+      "amount": "5000",
+      "currency": "XAF",
+      "status": "COMPLETED",
+      "mode": "LIVE",
+      "sessionToken": "tok_...",
+      "description": "Order #1042",
+      "metadata": { "orderId": "1042", "customerId": "cust_abc" },
+      "expiresAt": "2026-05-17T11:00:00.000Z",
+      "createdAt": "2026-05-17T10:00:00.000Z"
+    }
+  }
+}
+```
+
+### `payment.failed`
+
+Fired when a payment attempt fails (e.g. insufficient balance, wrong OTP).
+
+### `payment.expired`
+
+Fired when a payment intent passes its expiry time without being completed.
+
+---
+
+## Idempotency
+
+Webhooks may be delivered more than once. Design your handler to be **idempotent** — processing the same event twice should not cause double charges or duplicate fulfillments.
+
+```typescript
+async function handlePaymentCompleted(pi: PaymentIntent) {
+  const already = await db.orders.findByPaymentIntentId(pi.id);
+  if (already?.status === 'paid') return; // already processed
+
+  await db.orders.markPaid(pi.id, pi.metadata.orderId);
+  await emailService.sendReceipt(pi.metadata.customerId, pi.amount);
+}
+```
+
+---
+
+## Retries
+
+If your endpoint returns a non-2xx status, Lyel Pay will retry the delivery. The retry schedule is:
+
+| Attempt | Delay |
+|---------|-------|
+| 1st retry | 5 minutes |
+| 2nd retry | 30 minutes |
+| 3rd retry | 2 hours |
+| 4th retry | 12 hours |
+
+After 4 failed retries, the event is marked as undelivered. You can manually replay events from your dashboard.
+
+---
+
+## Testing webhooks locally
+
+Use a tunneling tool to expose your local server:
+
+```bash
+# Using ngrok
+ngrok http 3000
+
+# Using cloudflare tunnel
+cloudflare tunnel --url http://localhost:3000
+```
+
+Register the generated HTTPS URL as your webhook endpoint in the dashboard during development.

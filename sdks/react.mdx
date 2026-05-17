@@ -1,0 +1,153 @@
+---
+title: React SDK
+description: Drop-in payment form with react-lyel-pay-js
+---
+
+`react-lyel-pay-js` provides ready-made React components that embed the full Lyel Pay checkout experience — phone number entry, OTP validation, and payment confirmation — without you building the UI from scratch.
+
+---
+
+## Installation
+
+```bash
+npm install react-lyel-pay-js
+# or
+yarn add react-lyel-pay-js
+```
+
+---
+
+## Basic usage
+
+The simplest integration is two lines: initialize Lyel Pay with `loadLyelPay`, then drop in `<LyelPayElements />`.
+
+```tsx
+import { loadLyelPay, LyelPayElements } from 'react-lyel-pay-js';
+
+// Initialize outside the component (so it runs once)
+const lyelPayPromise = loadLyelPay(
+  'YOUR_API_KEY',      // your merchant API key
+  5000,                // amount (in smallest currency unit, e.g. 5 000 XAF)
+  'YOUR_CLIENT_SECRET' // your client secret
+);
+
+export default function CheckoutPage() {
+  return (
+    <div className="checkout-container">
+      <h2>Complete your payment</h2>
+      <LyelPayElements options={lyelPayPromise} />
+    </div>
+  );
+}
+```
+
+`LyelPayElements` automatically renders:
+1. A **checkout form** asking for the user's phone number and password
+2. An **OTP validation form** after the payment intent is created
+
+---
+
+## `loadLyelPay(apiKey, amount, clientSecret)`
+
+Initializes the Lyel Pay instance asynchronously. Returns a `Promise` that resolves to a `LyelPayInstance`.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `apiKey` | `string` | Your merchant API key |
+| `amount` | `number` | Amount to charge (e.g. `5000` for 5,000 XAF) |
+| `clientSecret` | `string` | Your client secret from the dashboard |
+
+```typescript
+const lyelPayPromise = loadLyelPay('YOUR_API_KEY', 5000, 'YOUR_CLIENT_SECRET');
+```
+
+---
+
+## `<LyelPayElements options={promise} />`
+
+The main checkout component. Pass the promise returned by `loadLyelPay` as the `options` prop.
+
+```tsx
+<LyelPayElements options={lyelPayPromise} />
+```
+
+The component manages its own internal state (step 1: credentials, step 2: OTP). No additional props are required for basic usage.
+
+---
+
+## Using the provider directly
+
+For advanced use cases — custom styling, multi-step flows, or accessing the Lyel Pay context in nested components — you can use `LyelPayProvider` and `useLyelPay` directly:
+
+```tsx
+import { LyelPayProvider, useLyelPay, loadLyelPay } from 'react-lyel-pay-js';
+
+const lyelPayPromise = loadLyelPay('YOUR_API_KEY', 5000, 'YOUR_CLIENT_SECRET');
+
+function PaymentButton() {
+  const context = useLyelPay();
+
+  if (!context?.lyelPay) return <div>Loading…</div>;
+
+  const { apiKey, amount } = context.lyelPay;
+
+  return (
+    <button onClick={() => console.log(`Paying ${amount} with key ${apiKey}`)}>
+      Pay now
+    </button>
+  );
+}
+
+export default function App() {
+  return (
+    <LyelPayProvider lyelPayInstance={lyelPayPromise}>
+      <PaymentButton />
+    </LyelPayProvider>
+  );
+}
+```
+
+---
+
+## `useLyelPay()`
+
+React hook that returns the current `LyelPayContextData` from the nearest `LyelPayProvider`.
+
+```typescript
+interface LyelPayContextData {
+  lyelPay: LyelPayInstance | undefined;
+}
+
+interface LyelPayInstance {
+  apiKey: string;
+  initializationDate: Date;
+  amount: number;
+  clientSecret: string;
+}
+```
+
+Returns `undefined` if used outside a `LyelPayProvider`.
+
+---
+
+## Customization
+
+The React SDK is intentionally minimal. For full UI control:
+
+- Use the [JavaScript SDK](/sdks/javascript) to drive the flow manually
+- Build your own form components and call `createIntention`, `initOtp`, `verifyOtp`, and `charge` directly
+
+Default styling uses inline styles. You can override classes in the rendered form elements using standard CSS.
+
+---
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="JavaScript SDK" icon="js" href="/sdks/javascript">
+    Build a fully custom checkout UI.
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/guides/webhooks">
+    Confirm payments server-side with webhooks.
+  </Card>
+</CardGroup>

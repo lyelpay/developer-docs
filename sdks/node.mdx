@@ -1,0 +1,232 @@
+---
+title: Node.js SDK
+description: Server-side integration with @lyel/lyel-pay-node
+---
+
+The Node.js SDK (`@lyel/lyel-pay-node`) is designed for **server-side environments**. Use it to create payment intents from your backend, retrieve their status, and validate incoming webhook events.
+
+---
+
+## Installation
+
+```bash
+npm install @lyel/lyel-pay-node
+```
+
+Requires Node.js 18+ (uses native `fetch` and `crypto`).
+
+---
+
+## Initialization
+
+```typescript
+import { LyelPay } from '@lyel/lyel-pay-node';
+
+const lyel = new LyelPay('YOUR_SECRET_KEY');
+```
+
+You can also pass options:
+
+```typescript
+const lyel = new LyelPay('YOUR_SECRET_KEY', {
+  baseUrl: 'https://api.lyelpay.com', // override for custom environments
+});
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `secretKey` | `string` | ✅ | Your secret API key |
+| `options.baseUrl` | `string` | ❌ | API base URL. Defaults to `https://api.lyelpay.com` |
+
+---
+
+## Payment Intents
+
+### `paymentIntents.create(params)`
+
+Creates a payment intent. Use this to initiate a payment from your server before showing the checkout to your user.
+
+```typescript
+const intent = await lyel.paymentIntents.create({
+  amount: '5000',     // string, in smallest currency unit (e.g. FCFA)
+  currency: 'XAF',   // 'XAF' | 'XOF'
+  description: 'Order #1042 — Boutique Fatou',
+  metadata: {
+    orderId: '1042',
+    customerId: 'cust_abc123',
+  },
+});
+
+console.log(intent.id);           // 'pi_xxx'
+console.log(intent.sessionToken); // pass to frontend for checkout
+console.log(intent.status);       // 'PENDING'
+console.log(intent.expiresAt);    // ISO timestamp
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `amount` | `string` | ✅ | Amount in smallest unit (e.g. `'5000'` = 5,000 XAF) |
+| `currency` | `'XAF' \| 'XOF'` | ✅ | Transaction currency |
+| `description` | `string` | ❌ | Human-readable description |
+| `metadata` | `Record<string, unknown>` | ❌ | Custom key-value pairs (e.g. order ID, customer ID) |
+
+**Returns: `PaymentIntent`**
+
+```typescript
+interface PaymentIntent {
+  id: string;
+  amount: string;
+  currency: string;
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
+  mode: 'LIVE' | 'TEST';
+  sessionToken: string;
+  reference?: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+  expiresAt: string; // ISO 8601
+  createdAt: string; // ISO 8601
+}
+```
+
+---
+
+### `paymentIntents.retrieve(sessionToken)`
+
+Retrieves the current status of a payment intent using its session token.
+
+```typescript
+const intent = await lyel.paymentIntents.retrieve(sessionToken);
+console.log(intent.status); // 'PENDING' | 'COMPLETED' | 'FAILED' | 'EXPIRED'
+```
+
+<Tip>
+  Use `retrieve()` to poll the status if you're not using webhooks. For production, webhooks are strongly preferred.
+</Tip>
+
+---
+
+## Webhooks
+
+### `webhooks.constructEvent(payload, header, secret)`
+
+Validates an incoming webhook event and returns the parsed event object. Throws if the signature is invalid or the timestamp is too old (> 5 minutes).
+
+```typescript
+// Express example — use raw body middleware
+app.post('/webhooks/lyelpay', express.raw({ type: 'application/json' }), (req, res) => {
+  const payload = req.body.toString();
+  const header = req.headers['lyel-signature'] as string;
+
+  let event: WebhookEvent;
+
+  try {
+    event = lyel.webhooks.constructEvent(payload, header, 'YOUR_WEBHOOK_SECRET');
+  } catch (err) {
+    console.error('Invalid webhook signature:', err.message);
+    return res.sendStatus(400);
+  }
+
+  switch (event.type) {
+    case 'payment.completed':
+      await fulfillOrder(event.data.paymentIntent);
+      break;
+    case 'payment.failed':
+      await notifyCustomer(event.data.paymentIntent);
+      break;
+    case 'payment.expired':
+      await cleanupExpiredOrder(event.data.paymentIntent);
+      break;
+  }
+
+  res.sendStatus(200);
+});
+```
+
+<Warning>
+  You must use a **raw body** (not parsed JSON) for signature validation to work. Using `express.json()` before this middleware will break the signature check.
+</Warning>
+
+**Signature format:**
+
+The `lyel-signature` header contains:
+
+```
+t=1716000000,v1=abc123def456...
+```
+
+- `t` — Unix timestamp of when the event was sent
+- `v1` — HMAC-SHA256 signature of `{timestamp}.{payload}`
+
+**Webhook event types:**
+
+| Type | Description |
+|------|-------------|
+| `payment.completed` | Payment was successfully processed |
+| `payment.failed` | Payment attempt failed |
+| `payment.expired` | Payment intent expired before completion |
+
+---
+
+## Error handling
+
+The SDK throws standard `Error` objects with an added `statusCode` property:
+
+```typescript
+try {
+  const intent = await lyel.paymentIntents.create({ ... });
+} catch (err) {
+  if (err.statusCode === 401) {
+    console.error('Invalid API key');
+  } else if (err.statusCode === 422) {
+    console.error('Validation error:', err.message);
+  } else {
+    throw err; // re-throw unexpected errors
+  }
+}
+```
+
+---
+
+## Full example: SaaS billing flow
+
+```typescript
+import { LyelPay } from '@lyel/lyel-pay-node';
+import express from 'express';
+
+const lyel = new LyelPay(process.env.LYELPAY_SECRET_KEY!);
+const app = express();
+
+// 1. Create intent when user clicks "Pay"
+app.post('/checkout', express.json(), async (req, res) => {
+  const { planId, userId } = req.body;
+  const plan = await getPlan(planId);
+
+  const intent = await lyel.paymentIntents.create({
+    amount: String(plan.price),
+    currency: 'XAF',
+    description: `Subscription — ${plan.name}`,
+    metadata: { planId, userId },
+  });
+
+  // Return sessionToken to frontend for checkout UI
+  res.json({ sessionToken: intent.sessionToken, intentId: intent.id });
+});
+
+// 2. Fulfill on webhook
+app.post('/webhooks/lyelpay', express.raw({ type: 'application/json' }), async (req, res) => {
+  const event = lyel.webhooks.constructEvent(
+    req.body.toString(),
+    req.headers['lyel-signature'] as string,
+    process.env.LYELPAY_WEBHOOK_SECRET!,
+  );
+
+  if (event.type === 'payment.completed') {
+    const { metadata } = event.data.paymentIntent;
+    await activateSubscription(metadata.userId, metadata.planId);
+  }
+
+  res.sendStatus(200);
+});
+```

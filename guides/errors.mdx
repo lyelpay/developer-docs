@@ -1,0 +1,242 @@
+---
+title: Error Handling
+description: Understand and handle Lyel Pay API errors with typed error codes.
+---
+
+All Lyel Pay API errors follow a consistent format. The `code` field is a stable string from the `@lyelpay/errors` package — it won't change between versions, so it's safe to key business logic on it.
+
+---
+
+## Error response format
+
+```json
+{
+  "statusCode": 422,
+  "message": "Insufficient funds",
+  "code": "E_INSUFFICIENT_FUNDS"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statusCode` | `number` | HTTP status code |
+| `message` | `string` | Human-readable description |
+| `code` | `string` | Stable error code — use this in your switch statements |
+
+---
+
+## Using typed error codes
+
+Install the errors package to get autocompletion and type safety:
+
+```bash
+npm install @lyelpay/errors
+```
+
+Then match errors by code:
+
+```typescript
+import { ErrorCodes } from '@lyelpay/errors';
+
+try {
+  await lyel.charge({ intentionId });
+} catch (err) {
+  switch (err.code) {
+    case ErrorCodes.E_INSUFFICIENT_FUNDS:
+      showToast('Your wallet balance is too low. Please top up and try again.');
+      break;
+    case ErrorCodes.E_INVALID_OTP:
+      showToast('Invalid code. Please check and try again.');
+      break;
+    case ErrorCodes.E_OTP_EXPIRED:
+      showToast('Your code has expired. Request a new one.');
+      break;
+    case ErrorCodes.E_OTP_BLOCKED:
+      showToast('Too many attempts. Please wait before trying again.');
+      break;
+    case ErrorCodes.E_ACCOUNT_BLOCKED:
+      showToast('This account has been blocked. Contact support.');
+      break;
+    default:
+      console.error('Unexpected error:', err.code, err.message);
+  }
+}
+```
+
+---
+
+## Common errors by scenario
+
+### Authentication
+
+| Code | HTTP | When it happens |
+|------|------|----------------|
+| `E_INVALID_API_KEY` | 401 | API key is wrong or revoked |
+| `E_UNAUTHORIZED` | 401 | No valid token on a protected endpoint |
+| `E_JWT_EXPIRED` | 401 | JWT has expired — re-authenticate |
+| `E_JWT_INVALID` | 401 | JWT is malformed or tampered |
+| `E_FORBIDDEN` | 403 | Valid token but insufficient permissions |
+
+### Payments
+
+| Code | HTTP | When it happens |
+|------|------|----------------|
+| `E_INSUFFICIENT_FUNDS` | 422 | Payer's wallet balance too low |
+| `E_SELF_PAYMENT` | 422 | Sender and recipient are the same account |
+| `E_INVALID_AMOUNT` | 422 | Amount is zero, negative, or exceeds limits |
+| `E_MAX_AMOUNT_EXCEEDED` | 422 | Above daily/transaction cap |
+| `E_MONTHLY_LIMIT_EXCEEDED` | 422 | User's monthly transfer limit reached |
+| `E_CREATE_PAYMENT_FAILED` | 500 | Internal error creating the payment |
+| `E_INTENTION_NOT_FOUND` | 404 | The `intentionId` doesn't exist or has expired |
+
+### OTP
+
+| Code | HTTP | When it happens |
+|------|------|----------------|
+| `E_INVALID_OTP` | 422 | Wrong OTP code entered |
+| `E_OTP_EXPIRED` | 422 | OTP has passed its validity window |
+| `E_OTP_BLOCKED` | 429 | Too many failed OTP attempts |
+| `E_OTP_COOLDOWN` | 429 | Too soon to request another OTP |
+| `E_MAX_DAILY_ATTEMPTS` | 429 | Daily OTP request limit reached |
+
+### Accounts
+
+| Code | HTTP | When it happens |
+|------|------|----------------|
+| `E_ACCOUNT_NOT_FOUND` | 404 | User ID or phone number not found |
+| `E_ACCOUNT_BLOCKED` | 403 | Account is temporarily suspended |
+| `E_ACCOUNT_PERMANENTLY_BLOCKED` | 403 | Account is permanently disabled |
+| `E_ACCOUNT_NOT_ACTIVATED` | 403 | Account created but not yet verified |
+| `E_KYC_LEVEL_INSUFFICIENT` | 403 | Operation requires a higher KYC tier |
+
+### Withdrawals
+
+| Code | HTTP | When it happens |
+|------|------|----------------|
+| `E_WITHDRAW_INSUFFICIENT_FUNDS` | 422 | Not enough balance to withdraw |
+| `E_WITHDRAW_DAILY_LIMIT_REACHED` | 422 | Daily withdrawal cap hit |
+| `E_WITHDRAW_NOT_FOUND` | 404 | Withdrawal ID doesn't exist |
+| `E_WITHDRAW_FORBIDDEN` | 403 | Account not authorized to withdraw |
+
+### Webhooks
+
+| Code | HTTP | When it happens |
+|------|------|----------------|
+| `E_INVALID_TOKEN` | 401 | Webhook signature verification failed |
+
+---
+
+## HTTP status codes
+
+| Status | Meaning |
+|--------|---------|
+| `200` | Success |
+| `201` | Created |
+| `400` | Bad request (malformed body, missing fields) |
+| `401` | Unauthenticated |
+| `403` | Authenticated but not authorized |
+| `404` | Resource not found |
+| `422` | Validation error or business rule violation |
+| `429` | Rate limit or cooldown |
+| `500` | Internal server error — contact support if persistent |
+
+---
+
+## Full error code list
+
+All error codes are exported from `@lyelpay/errors`:
+
+```typescript
+import { ErrorCodes, ErrorCode } from '@lyelpay/errors';
+
+// ErrorCode is the union type of all possible code values
+function handleError(code: ErrorCode) {
+  // TypeScript will warn you if you mistype a code
+}
+```
+
+The package exports `ErrorCodes` (the object) and `ErrorCode` (the type). Error codes are **stable API contracts** — they will not be renamed or removed.
+
+<Accordion title="View all error codes">
+
+```
+E_ACCOUNT_ALREADY_VERIFIED
+E_ACCOUNT_BLOCKED
+E_ACCOUNT_NOT_ACTIVATED
+E_ACCOUNT_NOT_ACTIVATED_OR_BLOCKED
+E_ACCOUNT_NOT_FOUND
+E_ACCOUNT_PERMANENTLY_BLOCKED
+E_API_KEY_NOT_FOUND
+E_API_KEY_REVOKE_ERROR
+E_BAD_GATEWAY_SMS
+E_BANK_DETAILS_REQUIRED
+E_BENEFICIARY_ACCOUNT_BLOCKED
+E_CANCEL_DEPOSIT_FAILED
+E_CANNOT_AUTHENTICATE
+E_COMMISSION_NOT_FOUND
+E_COMPANY_ALREADY_EXISTS
+E_COMPANY_NOT_FOUND
+E_CONTACT_ALREADY_EXISTS
+E_COUNTRY_NOT_AUTHORIZED
+E_COUNTRY_UNKNOWN
+E_CREATE_PAYMENT_FAILED
+E_DEPOSIT_ALREADY_RETRIED
+E_DEPOSIT_FAILED
+E_DEPOSIT_NOT_CANCELLABLE
+E_DEPOSIT_NOT_FOUND
+E_DEPOSIT_NOT_RETRYABLE
+E_DEPOSIT_TO_YOURSELF
+E_EMAIL_EXISTS
+E_FAILED_TO_CREATE_ACCOUNT
+E_FORBIDDEN
+E_GEO_RESTRICTED
+E_INSUFFICIENT_FUNDS
+E_INTENTION_NOT_FOUND
+E_INTERNAL_SERVER_ERROR
+E_INVALID_AMOUNT
+E_INVALID_API_KEY
+E_INVALID_OTP
+E_INVALID_PASSWORD
+E_INVALID_PERMISSIONS
+E_INVALID_PHONE_NUMBER
+E_INVALID_PROVIDER
+E_INVALID_REFRESH_TOKEN
+E_JWT_EXPIRED
+E_JWT_INVALID
+E_KYC_ALREADY_APPROVED
+E_KYC_DOCUMENT_NOT_FOUND
+E_KYC_FLAGGED
+E_KYC_LEVEL_INSUFFICIENT
+E_KYC_TIER_LIMIT_EXCEEDED
+E_LEDGER_FAILED
+E_MAX_AMOUNT_EXCEEDED
+E_MAX_DAILY_ATTEMPTS
+E_MERCHANT_BLOCKED
+E_MERCHANT_INACTIVE
+E_MERCHANT_INSUFFICIENT_BALANCE
+E_MERCHANT_NOT_FOUND
+E_MONTHLY_LIMIT_EXCEEDED
+E_NOT_FOUND
+E_OPERATION_TYPE_MISMATCH
+E_OTP_BLOCKED
+E_OTP_COOLDOWN
+E_OTP_EXPIRED
+E_PAYMENT_ALREADY_REFUNDED
+E_PAYMENT_NOT_FOUND
+E_PAYMENT_NOT_REFUNDABLE
+E_PHONE_EXISTS
+E_PROFILE_NOT_FOUND
+E_REFUND_AMOUNT_EXCEEDS_ORIGINAL
+E_SAME_USER
+E_SELF_PAYMENT
+E_TOO_FREQUENT_TRANSACTIONS
+E_UNAUTHORIZED
+E_USER_NOT_FOUND
+E_WITHDRAW_DAILY_LIMIT_REACHED
+E_WITHDRAW_FORBIDDEN
+E_WITHDRAW_INSUFFICIENT_FUNDS
+E_WITHDRAW_NOT_FOUND
+E_WRONG_PASSWORD
+```
+
+</Accordion>

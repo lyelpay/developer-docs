@@ -1,0 +1,156 @@
+---
+title: Accept a Payment
+description: End-to-end guide to collecting a payment with Lyel Pay.
+---
+
+This guide walks through a complete payment flow — from your server creating the intent to your frontend collecting the OTP and confirming the payment.
+
+---
+
+## Overview
+
+```
+Your server          Lyel Pay API           Your customer
+    │                     │                      │
+    │── POST /gateway ────▶│ Create intent        │
+    │◀─ { sessionToken } ─│                      │
+    │                     │                      │
+    │── (send token) ─────────────────────────▶  │
+    │                     │                      │
+    │                     │◀── initOtp ──────────│
+    │                     │──── OTP SMS ────────▶│
+    │                     │                      │
+    │                     │◀── verifyOtp (code) ─│
+    │                     │                      │
+    │                     │◀── charge ───────────│
+    │                     │──── webhook ────────▶│ (your server)
+```
+
+---
+
+## Step 1 — Create the intent (server)
+
+Always create the payment intent on your **server**, not in the browser. This keeps your secret key safe and lets you attach order metadata before the customer touches anything.
+
+```typescript
+// server.ts
+import { LyelPay } from '@lyel/lyel-pay-node';
+
+const lyel = new LyelPay(process.env.LYELPAY_SECRET_KEY!);
+
+app.post('/api/checkout', async (req, res) => {
+  const { orderId, customerId, amount } = req.body;
+
+  const intent = await lyel.paymentIntents.create({
+    amount: String(amount),
+    currency: 'XAF',
+    description: `Order #${orderId}`,
+    metadata: { orderId, customerId },
+  });
+
+  // Return only what the frontend needs
+  res.json({
+    intentId: intent.id,
+    sessionToken: intent.sessionToken,
+    expiresAt: intent.expiresAt,
+  });
+});
+```
+
+---
+
+## Step 2 — Drive the checkout (browser)
+
+Your frontend receives the `sessionToken` and uses it to guide the user through the OTP flow.
+
+```typescript
+// checkout.ts
+import { LyelPay, OPERATION_TYPE_ENDPOINTS } from '@lyel/lyel-pay-js';
+
+const lyel = new LyelPay({ apiKey: 'YOUR_API_KEY', env: 'production' });
+
+async function startCheckout(userId: string, intentionId: string) {
+  // Send OTP to the user
+  await lyel.initOtp({ userId, channel: 'sms' });
+  
+  // Show OTP input to user, then:
+  return async function confirmOtp(otp: string) {
+    await lyel.verifyOtp({ userId, otp });
+    const result = await lyel.charge({ intentionId });
+    return result;
+  };
+}
+```
+
+---
+
+## Step 3 — Listen for the result (server webhook)
+
+Don't rely on the frontend to confirm a payment. Use webhooks to fulfill orders server-side.
+
+```typescript
+// webhook.ts
+app.post('/webhooks/lyelpay', express.raw({ type: 'application/json' }), async (req, res) => {
+  const event = lyel.webhooks.constructEvent(
+    req.body.toString(),
+    req.headers['lyel-signature'] as string,
+    process.env.LYELPAY_WEBHOOK_SECRET!,
+  );
+
+  if (event.type === 'payment.completed') {
+    const pi = event.data.paymentIntent;
+    const { orderId, customerId } = pi.metadata as { orderId: string; customerId: string };
+    await db.orders.markPaid(orderId);
+    await emailService.sendReceipt(customerId, pi.amount, pi.currency);
+  }
+
+  res.sendStatus(200);
+});
+```
+
+---
+
+## Handling edge cases
+
+### Intent expired
+
+Payment intents expire after a set period. If a user takes too long:
+
+```typescript
+const intent = await lyel.paymentIntents.retrieve(sessionToken);
+if (intent.status === 'EXPIRED') {
+  // Create a new intent and restart checkout
+  redirect('/checkout');
+}
+```
+
+### OTP not received
+
+Add a "Resend code" button that calls `initOtp` again:
+
+```typescript
+async function resendOtp(userId: string) {
+  await lyel.initOtp({ userId, channel: 'sms' });
+}
+```
+
+### Failed payment
+
+The webhook will fire with `payment.failed`. Log the event and notify the user:
+
+```typescript
+if (event.type === 'payment.failed') {
+  await notifyUser('Your payment could not be processed. Please try again.');
+}
+```
+
+---
+
+## Checklist
+
+- [x] Create payment intents server-side (never in the browser)
+- [x] Pass only `sessionToken` and `intentId` to the frontend
+- [x] Validate the OTP on the Lyel Pay API, not yourself
+- [x] Fulfill orders from webhook events, not from the frontend redirect
+- [x] Handle `EXPIRED` and `FAILED` statuses gracefully
+- [x] Store `intentId` in your database to match webhook events to orders

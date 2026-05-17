@@ -1,0 +1,217 @@
+---
+title: JavaScript SDK
+description: Browser-side integration with @lyel/lyel-pay
+---
+
+The JavaScript SDK (`@lyel/lyel-pay`) is designed for **browser environments**. It orchestrates the full payment flow — intention, OTP, verification, and charge — from your web frontend.
+
+---
+
+## Installation
+
+```bash
+npm install @lyel/lyel-pay-js
+```
+
+Supports CommonJS and ESM.
+
+---
+
+## Initialization
+
+```typescript
+import { LyelPay } from '@lyel/lyel-pay-js';
+
+const lyel = new LyelPay({
+  apiKey: 'YOUR_API_KEY',
+  env: 'production', // or 'sandbox' (coming soon)
+});
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `apiKey` | `string` | ✅ | Your merchant API key |
+| `env` | `'production' \| 'sandbox'` | ❌ | Defaults to `'production'` |
+
+---
+
+## Payment flow
+
+All transactions follow the same four steps:
+
+```typescript
+import { LyelPay, OPERATION_TYPE_ENDPOINTS } from '@lyel/lyel-pay-js';
+
+const lyel = new LyelPay({ apiKey: 'YOUR_API_KEY', env: 'production' });
+
+// 1. Create an intention
+const intention = await lyel.createIntention(OPERATION_TYPE_ENDPOINTS.PAYMENT, {
+  amount: 5000,
+  from: 'MERCHANT_ID',
+  to: 'CLIENT_ID',
+  currency: 'XAF',
+  description: 'Order #1042',
+  metadata: { orderId: '1042' },
+});
+
+// 2. Send OTP to the user
+await lyel.initOtp({ userId: 'CLIENT_ID', channel: 'sms' });
+
+// 3. User enters OTP → you verify it
+await lyel.verifyOtp({ userId: 'CLIENT_ID', otp: userEnteredCode });
+
+// 4. Execute the transaction
+const result = await lyel.charge({ intentionId: intention.id });
+console.log('Payment complete ✅', result);
+```
+
+---
+
+## Methods
+
+### `createIntention(operation, params)`
+
+Creates a transaction intention. The intention reserves the operation and returns an ID used in the final charge step.
+
+```typescript
+lyel.createIntention(
+  OPERATION_TYPE_ENDPOINTS.PAYMENT,
+  {
+    amount: 5000,
+    from: 'MERCHANT_ID',
+    to: 'CLIENT_ID',
+    currency: 'XAF',       // optional, defaults to account currency
+    description: 'string', // optional
+    metadata: {},          // optional — any key/value pairs
+  }
+)
+```
+
+**Operation types:**
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `OPERATION_TYPE_ENDPOINTS.PAYMENT` | `'payment'` | Customer pays merchant |
+| `OPERATION_TYPE_ENDPOINTS.DEPOSIT` | `'deposit'` | Cash-in to wallet |
+| `OPERATION_TYPE_ENDPOINTS.WITHDRAW` | `'withdraw'` | Cash-out from wallet |
+| `OPERATION_TYPE_ENDPOINTS.TRANSFER` | `'transfer'` | Wallet to wallet |
+
+---
+
+### `initOtp(params)`
+
+Sends a one-time password to the user via SMS or email. Call this after creating the intention.
+
+```typescript
+await lyel.initOtp({
+  userId: 'CLIENT_ID',
+  channel: 'sms', // 'sms' | 'email' — defaults to 'sms'
+});
+```
+
+---
+
+### `verifyOtp(params)`
+
+Validates the OTP entered by the user. On success, Lyel Pay stores an authorization token in the SDK instance for use in `charge()`.
+
+```typescript
+await lyel.verifyOtp({
+  userId: 'CLIENT_ID',
+  otp: '123456',
+});
+```
+
+---
+
+### `charge(params)`
+
+Executes the transaction using the stored authorization token.
+
+```typescript
+const result = await lyel.charge({
+  intentionId: intention.id,
+  confirmationMethod: 'automatic', // optional
+  metadata: {},                    // optional
+});
+```
+
+---
+
+### `getToken()`
+
+Returns the current OTP authorization token held in memory (or `null` if not yet verified).
+
+```typescript
+const token = lyel.getToken();
+```
+
+---
+
+## Error handling
+
+The SDK extends `EventEmitter`. Listen for errors globally:
+
+```typescript
+lyel.on('error', (err) => {
+  console.error('Lyel Pay error:', err.message);
+});
+```
+
+Or handle them per call using try/catch:
+
+```typescript
+try {
+  await lyel.charge({ intentionId: intention.id });
+} catch (err) {
+  console.error(err.message);
+}
+```
+
+See [Error Codes](/guides/errors) for the full list of typed error codes.
+
+---
+
+## TypeScript types
+
+```typescript
+interface IntentionParams {
+  amount: number;
+  from: string;
+  to: string;
+  currency?: string;
+  description?: string;
+  metadata?: Record<string, any>;
+}
+
+interface InitOtpParams {
+  userId: string;
+  channel?: 'sms' | 'email';
+}
+
+interface VerifyOtpParams {
+  userId: string;
+  otp: string;
+}
+
+interface TransactionParams {
+  intentionId: string;
+  confirmationMethod?: string;
+  metadata?: Record<string, any>;
+}
+
+enum OPERATION_TYPE_ENDPOINTS {
+  DEPOSIT = 'deposit',
+  WITHDRAW = 'withdraw',
+  PAYMENT = 'payment',
+  TRANSFER = 'transfer',
+}
+```
+
+---
+
+## Notes
+
+- The OTP token is stored **in memory** in the `LyelPay` instance — it is not persisted to `localStorage` or cookies.
+- Create a new `LyelPay` instance per payment session, or call a custom `logout()` to clear the stored token between transactions.
+- For server-initiated payments, use the [Node.js SDK](/sdks/node) instead.

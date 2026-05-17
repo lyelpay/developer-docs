@@ -1,0 +1,86 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Lyel Pay",
+  "logo": {
+    "dark": "/logo/lyelpay-dark.svg",
+    "light": "/logo/lyelpay-light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#F97316",
+    "light": "#FB923C",
+    "dark": "#EA580C",
+    "anchors": {
+      "from": "#F97316",
+      "to": "#EA580C"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Dashboard",
+      "url": "https://dashboard.lyelpay.com"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get API Keys",
+    "url": "https://dashboard.lyelpay.com/settings/api-keys"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "Status",
+      "icon": "signal",
+      "url": "https://status.lyelpay.com"
+    },
+    {
+      "name": "Community",
+      "icon": "discord",
+      "url": "https://discord.gg/lyelpay"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Get Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "authentication",
+        "sandbox"
+      ]
+    },
+    {
+      "group": "SDKs",
+      "pages": [
+        "sdks/javascript",
+        "sdks/node",
+        "sdks/react"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/accept-payment",
+        "guides/webhooks",
+        "guides/errors"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/payment-intents",
+        "api-reference/transfers",
+        "api-reference/wallet",
+        "api-reference/authentication"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "x": "https://x.com/lyelpay",
+    "linkedin": "https://linkedin.com/company/lyelpay"
+  }
+}
