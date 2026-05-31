@@ -15,7 +15,7 @@
       "to": "#0ECBB8"
     }
   },
-  "topbarCta": {
+  "topbarCtaButton": {
     "name": "Dashboard",
     "url": "https://lyel-pay-developer-portal.vercel.app"
   },
