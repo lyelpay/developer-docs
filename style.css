@@ -12,15 +12,15 @@
 
 #topbar-cta-button,
 [data-component-name="primary-header-button"] {
-  background-color: #fe6a49 !important;
-  border-color: #fe6a49 !important;
+  background-color: #0ECBB8 !important;
+  border-color: #0ECBB8 !important;
   color: #ffffff !important;
 }
 
 #topbar-cta-button:hover,
 [data-component-name="primary-header-button"]:hover {
-  background-color: #ff8066 !important;
-  border-color: #ff8066 !important;
+  background-color: #5EEAD4 !important;
+  border-color: #5EEAD4 !important;
 }
 
 card {
