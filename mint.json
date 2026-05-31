@@ -17,7 +17,8 @@
   },
   "topbarCtaButton": {
     "name": "Dashboard",
-    "url": "https://lyel-pay-developer-portal.vercel.app"
+    "url": "https://lyel-pay-developer-portal.vercel.app",
+    "type": "link"
   },
   "anchors": [
     {
