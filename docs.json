@@ -66,6 +66,13 @@
       ]
     }
   },
+  "navbar": {
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://lyel-pay-developer-portal.vercel.app"
+    }
+  },
   "logo": {
     "light": "/logo/logo-light.svg",
     "dark": "/logo/logo-dark.svg"
