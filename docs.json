@@ -37,7 +37,14 @@
             "pages": [
               "sdks/javascript",
               "sdks/node",
+              "sdks/python",
               "sdks/react"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/odoo"
             ]
           },
           {

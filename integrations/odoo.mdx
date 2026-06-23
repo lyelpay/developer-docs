@@ -1,0 +1,153 @@
+---
+title: Odoo
+description: Accept Lyel Pay payments natively from your Odoo checkout
+---
+
+The official Lyel Pay payment provider for Odoo. Accept mobile money (Airtel, Orange, MTN) and card payments on `website_sale` checkout and on customer invoice payment links. Supports **Odoo 17** and **Odoo 18** (Community and Enterprise).
+
+---
+
+## How it works
+
+1. The customer reaches the Odoo checkout and picks Lyel Pay.
+2. Odoo creates a `payment.transaction` and asks the module for rendering values.
+3. The module calls the Lyel Pay API server-side to create a `PaymentIntent` and gets back a `session_token`.
+4. Odoo renders an inline `<iframe>` pointing at the hosted Lyel Pay checkout.
+5. The customer pays in the iframe; the widget posts a success/failure message back.
+6. **Authoritatively:** Lyel Pay sends a signed webhook to your Odoo instance; the module verifies the signature and updates the transaction state. This is what fulfils the order — the browser message is just a UX hint.
+
+---
+
+## Install
+
+### From the Odoo Apps store
+
+Search **Lyel Pay** in **Apps**, click Install.
+
+### From source
+
+```bash
+git clone https://github.com/lyelpay/sdks.git
+cp -r sdks/lyel-pay-odoo/payment_lyel_pay /path/to/your/odoo/addons/
+```
+
+Restart Odoo, update the Apps list, install **Lyel Pay**.
+
+### Runtime dependency
+
+The module uses the official Python SDK on the server side:
+
+```bash
+pip install "lyel-pay>=0.2.0"
+```
+
+See the [Python SDK reference](/sdks/python) for details.
+
+---
+
+## Configure
+
+1. Open **Settings → Payment Providers**.
+2. Click **Lyel Pay**.
+3. Set **State** to *Test* (sandbox) or *Enabled* (production).
+4. Fill in:
+
+| Field                | Where to find it                                                          |
+| -------------------- | ------------------------------------------------------------------------- |
+| **Publishable key**  | Lyel Pay dashboard → Developers → API keys (`pk_test_...` / `pk_live_...`) |
+| **Secret key**       | Lyel Pay dashboard → Developers → API keys (`sk_test_...` / `sk_live_...`) |
+| **Webhook secret**   | Lyel Pay dashboard → Developers → Webhooks (`whsec_...`)                  |
+| **Checkout URL**     | Default `https://checkout.lyelpay.com`. Override only for self-hosted.     |
+
+5. Save.
+
+<Warning>
+  Set the provider **State to *Test*** while you validate. *Enabled* moves to
+  production keys and starts charging real customers.
+</Warning>
+
+---
+
+## Webhook URL
+
+Once the provider is saved, configure this URL in **Lyel Pay dashboard → Developers → Webhooks**:
+
+```
+https://<your-odoo-domain>/payment/lyel_pay/webhook
+```
+
+The module verifies the `Lyel-Signature` HMAC on every call. Unsigned or stale (older than 5 minutes) requests are rejected with `400`.
+
+---
+
+## Supported currencies
+
+`XAF`, `XOF`, `CDF`, `EUR`, `USD`.
+
+Odoo automatically restricts the provider to currencies activated on the merchant's company; if the customer's cart is in another currency, Lyel Pay does not appear in their checkout options.
+
+---
+
+## Payment methods
+
+Out of the box the module ships three mobile money methods:
+
+- **Airtel Money** (`airtel_money`)
+- **Orange Money** (`orange_money`)
+- **MTN Mobile Money** (`mtn_mobile_money`)
+
+Card payments are enabled through the same provider when activated on your Lyel Pay account.
+
+---
+
+## Local development
+
+The repository ships with a `docker-compose.yml` that runs Postgres + Odoo 17 + Odoo 18 with the module mounted as an extra addon.
+
+```bash
+git clone https://github.com/lyelpay/sdks.git
+cd sdks/lyel-pay-odoo
+docker compose up -d
+```
+
+- Odoo 17: [`http://localhost:8069`](http://localhost:8069)
+- Odoo 18: [`http://localhost:8070`](http://localhost:8070)
+
+Master password is `admin`. Install **Lyel Pay** from the Apps menu after creating a database.
+
+To wipe everything:
+
+```bash
+docker compose down -v
+```
+
+---
+
+## Run the module tests
+
+```bash
+docker compose exec odoo17 odoo \
+  -d test_lyel_pay --test-enable --stop-after-init \
+  -i payment_lyel_pay
+```
+
+Swap `odoo17` for `odoo18` to run the same suite on Odoo 18.
+
+---
+
+## What this MVP does *not* cover (yet)
+
+| Feature                       | Status                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| Refunds from Odoo             | Planned. Issue a refund from the Lyel Pay dashboard in the meantime.       |
+| Recurring / tokenized cards   | Planned for subscription use-cases.                                        |
+| POS (point of sale)           | Planned as a separate `pos_lyel_pay` module.                               |
+| Express checkout / 1-click    | Not on the immediate roadmap.                                              |
+
+---
+
+## Source & support
+
+- Source: [`github.com/lyelpay/sdks/tree/main/lyel-pay-odoo`](https://github.com/lyelpay/sdks/tree/main/lyel-pay-odoo)
+- Issues: [`github.com/lyelpay/sdks/issues`](https://github.com/lyelpay/sdks/issues)
+- Email: [`support@lyelpay.com`](mailto:support@lyelpay.com)

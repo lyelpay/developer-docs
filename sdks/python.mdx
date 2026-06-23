@@ -1,0 +1,244 @@
+---
+title: Python SDK
+description: Server-side integration with the lyel-pay Python package
+---
+
+The Python SDK (`lyel-pay`) is designed for **server-side environments**. Use it from Django, Flask, FastAPI, Odoo, or any Python backend to create payment intents, retrieve their status, and validate incoming webhook events.
+
+---
+
+## Installation
+
+```bash
+pip install "lyel-pay>=0.2.0"
+```
+
+Requires Python 3.9 or later. Depends on [`httpx`](https://www.python-httpx.org/).
+
+---
+
+## Initialization
+
+The simplest setup reads the secret key from the `LYEL_PAY_SECRET_KEY` environment variable and points at sandbox while you build:
+
+```python
+from lyel_pay import LyelPay
+
+client = LyelPay(environment="sandbox")
+```
+
+Or pass the key explicitly:
+
+```python
+client = LyelPay(secret_key="sk_test_...", environment="sandbox")
+```
+
+| Parameter     | Type     | Required | Description                                                                       |
+| ------------- | -------- | -------- | --------------------------------------------------------------------------------- |
+| `secret_key`  | `str`    | ✅\*     | Secret API key. Falls back to `LYEL_PAY_SECRET_KEY` env var if omitted.            |
+| `environment` | `str`    | ❌       | `"sandbox"` or `"production"`. Defaults to `"production"`.                          |
+| `base_url`    | `str`    | ❌       | Override the API base URL. Useful for staging.                                     |
+| `timeout`     | `float`  | ❌       | Per-request timeout in seconds. Defaults to `30.0`.                                |
+
+<Tip>
+  Constructing the client without a key and without the environment variable
+  raises `ValueError`. Always configure one or the other.
+</Tip>
+
+---
+
+## Payment Intents
+
+### `client.payment_intents.create(...)`
+
+Create a payment intent from your backend before showing the checkout to the customer.
+
+```python
+intent = client.payment_intents.create(
+    amount="1500.00",
+    currency="XAF",
+    description="Order #1042",
+    metadata={"order_id": "1042", "customer_id": "cust_abc123"},
+    idempotency_key="order-1042-attempt-1",  # optional
+)
+
+print(intent["id"])             # 'pi_...'
+print(intent["session_token"])  # pass to your frontend
+print(intent["status"])         # 'PENDING'
+```
+
+**Parameters:**
+
+| Field             | Type            | Required | Description                                                                 |
+| ----------------- | --------------- | -------- | --------------------------------------------------------------------------- |
+| `amount`          | `str`           | ✅       | Amount as a decimal string (e.g. `"1500.00"`).                              |
+| `currency`        | `str`           | ✅       | ISO 4217 currency code: `XAF`, `XOF`, `CDF`, `EUR`, `USD`.                  |
+| `description`     | `str`           | ❌       | Human-readable description.                                                 |
+| `metadata`        | `dict`          | ❌       | Custom key/value pairs. Returned on webhook events.                         |
+| `idempotency_key` | `str`           | ❌       | Safe-retry token. Auto-generated as a UUID4 if omitted.                     |
+
+<Tip>
+  Pass an explicit `idempotency_key` derived from a stable identifier (e.g. your
+  order ID) when the same logical operation may be retried — the API will
+  deduplicate so you never create a second intent for the same order.
+</Tip>
+
+---
+
+### `client.payment_intents.retrieve(session_token)`
+
+Retrieve the current status of an intent using its session token.
+
+```python
+state = client.payment_intents.retrieve(session_token=intent["session_token"])
+print(state["status"])  # 'PENDING' | 'COMPLETED' | 'FAILED' | 'EXPIRED'
+```
+
+<Tip>
+  Use `retrieve()` only as a fallback. For production, webhooks are the
+  authoritative source of truth — they keep state correct even when the
+  customer closes their browser mid-payment.
+</Tip>
+
+---
+
+## Webhooks
+
+### `WebhookVerifier().construct_event(payload, header, secret)`
+
+Validates an incoming webhook event and returns the parsed event. Raises `ValueError` if the signature is invalid or the timestamp is older than 5 minutes.
+
+```python
+# Flask example — use request.get_data() to get the RAW body
+from flask import Flask, request
+from lyel_pay import WebhookVerifier
+
+app = Flask(__name__)
+verifier = WebhookVerifier()
+
+@app.post("/webhooks/lyelpay")
+def webhook():
+    payload = request.get_data()  # raw bytes, NOT request.get_json()
+    header = request.headers.get("Lyel-Signature", "")
+
+    try:
+        event = verifier.construct_event(
+            payload=payload,
+            header=header,
+            secret="YOUR_WEBHOOK_SECRET",
+        )
+    except ValueError as exc:
+        return {"error": str(exc)}, 400
+
+    if event.type == "payment.completed":
+        fulfill_order(event.data["paymentIntent"])
+    elif event.type == "payment.failed":
+        notify_customer(event.data["paymentIntent"])
+    elif event.type == "payment.expired":
+        cleanup_expired_order(event.data["paymentIntent"])
+
+    return {"received": True}, 200
+```
+
+<Warning>
+  Use the **raw request body** (e.g. `request.get_data()` in Flask, `request.body`
+  in Django, `await request.body()` in FastAPI). Re-serializing the parsed JSON
+  changes the byte order and breaks the HMAC check.
+</Warning>
+
+**Signature format:** the `Lyel-Signature` header carries
+
+```
+t=1716000000,v1=abc123def456...
+```
+
+- `t` — Unix timestamp at emission
+- `v1` — HMAC-SHA256 of `"{t}.{payload}"`, keyed by your webhook secret
+
+**Webhook event types:**
+
+| Type                | Description                                |
+| ------------------- | ------------------------------------------ |
+| `payment.completed` | Payment was successfully processed         |
+| `payment.failed`    | Payment attempt failed                     |
+| `payment.expired`   | Intent expired before completion           |
+
+---
+
+## Error handling
+
+API errors raise `LyelPayError`, which carries the HTTP status code:
+
+```python
+from lyel_pay import LyelPay, LyelPayError
+
+client = LyelPay(environment="sandbox")
+
+try:
+    intent = client.payment_intents.create(amount="1500.00", currency="XAF")
+except LyelPayError as exc:
+    if exc.status_code == 401:
+        print("Invalid API key")
+    elif exc.status_code == 422:
+        print("Validation error:", exc)
+    else:
+        raise
+```
+
+The SDK retries automatically on `5xx` responses and network errors — 3 attempts with exponential backoff (1s, 2s). `4xx` errors are surfaced immediately without retry, because they will not succeed on retry.
+
+---
+
+## Full example: Django checkout
+
+```python
+# views.py
+import os
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from lyel_pay import LyelPay, WebhookVerifier
+
+client = LyelPay(environment="sandbox")  # reads LYEL_PAY_SECRET_KEY
+verifier = WebhookVerifier()
+
+
+def start_checkout(request):
+    order = get_order(request.GET["order_id"])
+    intent = client.payment_intents.create(
+        amount=str(order.total),
+        currency="XAF",
+        description=f"Order #{order.id}",
+        metadata={"order_id": str(order.id)},
+        idempotency_key=f"order-{order.id}",
+    )
+    return JsonResponse({
+        "session_token": intent["session_token"],
+        "intent_id": intent["id"],
+    })
+
+
+@csrf_exempt
+def webhook(request):
+    try:
+        event = verifier.construct_event(
+            payload=request.body,
+            header=request.headers.get("Lyel-Signature", ""),
+            secret=os.environ["LYEL_PAY_WEBHOOK_SECRET"],
+        )
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    if event.type == "payment.completed":
+        order_id = event.data["paymentIntent"]["metadata"]["order_id"]
+        mark_order_paid(order_id)
+
+    return JsonResponse({"received": True})
+```
+
+---
+
+## Source & changelog
+
+- Package on PyPI: [`lyel-pay`](https://pypi.org/project/lyel-pay/)
+- Source: [`github.com/lyelpay/sdks/tree/main/lyel-pay-python`](https://github.com/lyelpay/sdks/tree/main/lyel-pay-python)
+- Changelog: see [`CHANGELOG.md`](https://github.com/lyelpay/sdks/blob/main/lyel-pay-python/CHANGELOG.md)
